@@ -1,32 +1,66 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { auth } from '$lib/auth';
+  import { get } from 'svelte/store';
   
   let salesUsers = $state([]);
   let activities = $state([]);
   let selectedSales = $state("");
 
   async function fetchActivities() {
-    const params = new URLSearchParams();
-    if (selectedSales) params.append('salesId', selectedSales);
+    try {
+      const params = new URLSearchParams();
+      if (selectedSales) params.append('salesId', selectedSales);
 
-    const res = await fetch(`http://localhost:3000/sales/activities?${params.toString()}`);
-    activities = await res.json();
+      const res = await fetch(`http://localhost:3001/api/activities?${params.toString()}`, {
+        headers: {
+          'Authorization': `Bearer ${$auth.token}`
+        }
+      });
+      if (!res.ok) throw new Error('Failed to fetch activities');
+      activities = await res.json();
+    } catch (e) {
+      console.error(e);
+    }
   }
 
-  async function handleDelete(id) {
+  async function handleDelete(id: number) {
     if (!confirm("Are you sure you want to delete this activity log?")) return;
-    await fetch(`http://localhost:3000/sales/activity/${id}`, { method: 'DELETE' });
-    fetchActivities();
+    try {
+      const res = await fetch(`http://localhost:3001/api/activities/${id}`, { 
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${$auth.token}`
+        }
+      });
+      if (!res.ok) throw new Error('Failed to delete activity');
+      fetchActivities();
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   function handleExportExcel() {
-    const url = `http://localhost:3000/sales/export/excel${selectedSales ? '?salesId=' + selectedSales : ''}`;
+    const url = `http://localhost:3001/api/activities/export/excel${selectedSales ? '?salesId=' + selectedSales : ''}`;
+    // We might need to handle token for window.open, usually via a temporary download token or query param
+    // But for now we'll just open it. Secure excel export might need a different approach.
     window.open(url, '_blank');
   }
 
   onMount(async () => {
-    salesUsers = await fetch('http://localhost:3000/sales-users').then(r => r.json());
-    fetchActivities();
+    try {
+      const usersRes = await fetch('http://localhost:3001/api/users', {
+        headers: {
+          'Authorization': `Bearer ${$auth.token}`
+        }
+      });
+      if (usersRes.ok) {
+        salesUsers = await usersRes.json();
+      }
+      fetchActivities();
+    } catch (e) {
+      console.error(e);
+    }
   });
 </script>
 
@@ -69,22 +103,22 @@
       <div class="bg-white dark:bg-neutral-800 rounded-2xl p-6 shadow-sm border border-neutral-100 dark:border-neutral-700 space-y-4 hover:border-blue-200 dark:hover:border-blue-800 transition-all">
         <div class="flex justify-between items-start">
           <div>
-            <h4 class="font-bold text-lg">{a.pensioner.name}</h4>
-            <p class="text-xs text-neutral-400 font-medium tracking-wide uppercase">{new Date(a.visitedAt).toLocaleString()}</p>
+            <h4 class="font-bold text-lg">{a.client?.shop_name || 'Unknown Client'}</h4>
+            <p class="text-xs text-neutral-400 font-medium tracking-wide uppercase">{new Date(a.check_in_time).toLocaleString()}</p>
           </div>
           <button onclick={() => handleDelete(a.id)} aria-label="Delete activity" class="text-neutral-300 hover:text-red-500 transition-colors">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
           </button>
         </div>
 
-        <p class="text-sm text-neutral-600 dark:text-neutral-300 line-clamp-3 italic">"{a.description || 'No description provided'}"</p>
+        <p class="text-sm text-neutral-600 dark:text-neutral-300 line-clamp-3 italic">"{a.notes || 'No notes provided'}"</p>
 
         <div class="flex items-center gap-3 pt-2">
           <button class="flex-1 bg-neutral-100 dark:bg-neutral-900 text-neutral-600 dark:text-neutral-400 py-2 rounded-lg text-xs font-bold hover:bg-blue-600 hover:text-white transition-all flex justify-center items-center gap-2">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
             Detail Activity
           </button>
-          <a href="https://www.google.com/maps?q={a.latitude},{a.longitude}" target="_blank" class="flex-1 bg-neutral-100 dark:bg-neutral-900 text-neutral-600 dark:text-neutral-400 py-2 rounded-lg text-xs font-bold hover:bg-emerald-600 hover:text-white transition-all flex justify-center items-center gap-2 text-center">
+          <a href="https://www.google.com/maps?q={a.lat},{a.long}" target="_blank" class="flex-1 bg-neutral-100 dark:bg-neutral-900 text-neutral-600 dark:text-neutral-400 py-2 rounded-lg text-xs font-bold hover:bg-emerald-600 hover:text-white transition-all flex justify-center items-center gap-2 text-center">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
             Geotagging
           </a>

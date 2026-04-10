@@ -1,18 +1,28 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { page } from '$app/stores';
+  import { page } from '$app/state';
+  import { auth } from '$lib/auth';
   
   let pensioner = $state(null);
-  const id = $page.params.id;
+  const id = page.params.id;
 
   onMount(async () => {
-    // Fetch details for the specific pensioner
-    const res = await fetch(`http://localhost:3000/supervision/pensioners?search=${id}`); // Simple mock search by id/name
-    const data = await res.json();
-    pensioner = data[0];
-    
-    if (pensioner) {
-        setTimeout(() => window.print(), 1000);
+    try {
+        // Fetch details for the specific pensioner
+        const res = await fetch(`http://localhost:3001/api/supervision/pensioners?search=${id}`, {
+            headers: {
+                'Authorization': `Bearer ${$auth.token}`
+            }
+        }); 
+        if (!res.ok) throw new Error('Failed to fetch pensioner');
+        const data = await res.json();
+        pensioner = data.find((p: any) => p.id === Number(id)) || data[0];
+        
+        if (pensioner) {
+            setTimeout(() => window.print(), 1000);
+        }
+    } catch (e) {
+        console.error(e);
     }
   });
 </script>

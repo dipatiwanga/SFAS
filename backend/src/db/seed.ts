@@ -8,35 +8,20 @@ async function main() {
   const connection = await mysql.createConnection(DB_URL);
   const db = drizzle(connection);
 
-  console.log('Seeding database...');
+  console.log('Seeding database with new model...');
 
-  // 1. Seed Partners
-  await db.insert(schema.partners).values([
-    { name: 'DAPENBUN', category: 'Dapen' },
-    { name: 'DP4', category: 'Dapen' },
-    { name: 'PERTAMINA', category: 'Dapen' },
-  ]);
-
-  // 2. Seed Offices
-  await db.insert(schema.offices).values([
-    { name: 'KC Jakarta Pusat', location: 'Jakarta' },
-    { name: 'KC Surabaya', location: 'Surabaya' },
-    { name: 'KC Bandung', location: 'Bandung' },
-  ]);
-
-  // 3. Seed Users (Supervisior & Sales)
+  // 1. Seed Users
   await db.insert(schema.users).values([
-    { name: 'Budi Supervisor', email: 'budi@sfas.com', role: 'supervisor' },
-    { name: 'Ani Sales', email: 'ani@sfas.com', role: 'sales' },
-    { name: 'Iwan Sales', email: 'iwan@sfas.com', role: 'sales' },
+    { name: 'Admin User', email: 'admin@sfas.com', password: await Bun.password.hash('password123'), role: 'admin' },
+    { name: 'Sales Joni', email: 'joni@sfas.com', password: await Bun.password.hash('password123'), role: 'sales' },
+    { name: 'Sales Susi', email: 'susi@sfas.com', password: await Bun.password.hash('password123'), role: 'sales' },
   ]);
 
-  // 4. Seed Pensioners (Leads)
-  await db.insert(schema.pensioners).values([
-    { name: 'Slamet Riyadi', partnerId: 1, officeId: 1, status: 'Prospect' },
-    { name: 'Siti Aminah', partnerId: 1, officeId: 1, status: 'Prospect' },
-    { name: 'Joko Widodo', partnerId: 2, officeId: 2, status: 'Prospect' },
-    { name: 'Kartini', partnerId: 3, officeId: 3, status: 'Prospect' },
+  // 2. Seed Clients (Shops)
+  await db.insert(schema.clients).values([
+    { shop_name: 'Toko Kelontong Berkah', address: 'Jl. Merdeka No. 10', contact: '08123456789' },
+    { shop_name: 'Warung Makan Enak', address: 'Jl. Mawar No. 5', contact: '08122223333' },
+    { shop_name: 'Minimarket Sejahtera', address: 'Jl. Melati No. 20', contact: '08199998888' },
   ]);
 
   console.log('Seeding completed!');

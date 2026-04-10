@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { auth } from '$lib/auth';
   
   let stats = $state({
     totalLeads: 0,
@@ -8,12 +9,20 @@
   });
 
   onMount(async () => {
-    // Mock fetching stats or real fetch if needed
-    const res = await fetch('http://localhost:3000/supervision/pensioners');
-    const data = await res.json();
-    stats.totalLeads = data.length;
-    stats.visited = data.filter((p: any) => p.status === 'Visited').length;
-    stats.allocated = data.filter((p: any) => p.status === 'Allocated' || p.status === 'Visited').length;
+    try {
+      const res = await fetch('http://localhost:3001/api/activities', {
+        headers: {
+          'Authorization': `Bearer ${$auth.token}`
+        }
+      });
+      if (!res.ok) throw new Error('Failed to fetch stats');
+      const data = await res.json();
+      stats.totalLeads = 150; 
+      stats.visited = data.filter((p: any) => p.check_in_time).length;
+      stats.allocated = data.length;
+    } catch (e) {
+      console.error(e);
+    }
   });
 </script>
 
