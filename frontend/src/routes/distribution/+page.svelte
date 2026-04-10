@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { auth } from '$lib/auth';
   
   let partners = $state([]);
   let offices = $state([]);
@@ -15,47 +16,77 @@
   let selectedLeads = $state(new Set());
 
   async function fetchData() {
-    const params = new URLSearchParams();
-    if (selectedPartner) params.append('partnerId', selectedPartner);
-    if (selectedOffice) params.append('officeId', selectedOffice);
-    if (selectedStatus) params.append('status', selectedStatus);
-    if (searchQuery) params.append('search', searchQuery);
+    try {
+      const params = new URLSearchParams();
+      if (selectedPartner) params.append('partnerId', selectedPartner);
+      if (selectedOffice) params.append('officeId', selectedOffice);
+      if (selectedStatus) params.append('status', selectedStatus);
+      if (searchQuery) params.append('search', searchQuery);
 
-    const res = await fetch(`http://localhost:3000/supervision/pensioners?${params.toString()}`);
-    pensioners = await res.json();
+      const res = await fetch(`http://localhost:3001/api/supervision/pensioners?${params.toString()}`, {
+        headers: {
+          'Authorization': `Bearer ${$auth.token}`
+        }
+      });
+      if (!res.ok) throw new Error('Failed to fetch pensioners');
+      pensioners = await res.json();
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   async function handleReassign() {
     if (selectedLeads.size === 0 || !selectedPIC) return alert("Select leads and PIC");
     
-    await fetch('http://localhost:3000/supervision/reassign', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ids: Array.from(selectedLeads),
-        picSalesId: Number(selectedPIC)
-      })
-    });
-    
-    selectedLeads.clear();
-    fetchData();
-    alert("Leads reassigned successfully");
+    try {
+      const res = await fetch('http://localhost:3001/api/supervision/reassign', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${$auth.token}`
+        },
+        body: JSON.stringify({
+          ids: Array.from(selectedLeads),
+          picSalesId: Number(selectedPIC)
+        })
+      });
+      
+      if (!res.ok) throw new Error('Failed to reassign leads');
+      
+      selectedLeads.clear();
+      fetchData();
+      alert("Leads reassigned successfully");
+    } catch (e) {
+      console.error(e);
+      alert("Error: " + (e as Error).message);
+    }
   }
 
-  function toggleLead(id) {
+  function toggleLead(id: number) {
     if (selectedLeads.has(id)) selectedLeads.delete(id);
     else selectedLeads.add(id);
-    selectedLeads = selectedLeads; // Trigger reactivity
+    selectedLeads = new Set(selectedLeads); // Trigger reactivity
   }
 
   onMount(async () => {
-    partnerPromise = fetch('http://localhost:3000/partners').then(r => r.json()).then(d => partners = d);
-    officePromise = fetch('http://localhost:3000/offices').then(r => r.json()).then(d => offices = d);
-    salesPromise = fetch('http://localhost:3000/sales-users').then(r => r.json()).then(d => salesUsers = d);
-    fetchData();
-  });
+    try {
+      const headers = { 'Authorization': `Bearer ${$auth.token}` };
+      
+      const [pRes, oRes, sRes] = await Promise.all([
+        fetch('http://localhost:3001/api/partners', { headers }),
+        fetch('http://localhost:3001/api/offices', { headers }),
+        fetch('http://localhost:3001/api/users', { headers })
+      ]);
 
-  let partnerPromise, officePromise, salesPromise;
+      if (pRes.ok) partners = await pRes.json();
+      if (oRes.ok) offices = await oRes.json();
+      if (sRes.ok) salesUsers = await sRes.json();
+      
+      fetchData();
+    } catch (e) {
+      console.error(e);
+    }
+  });
 </script>
 
 <div class="space-y-6">
@@ -119,8 +150,9 @@
         <tr class="bg-neutral-50 dark:bg-neutral-900/50 text-neutral-400 text-xs font-bold uppercase tracking-wider">
           <th class="p-4 w-12 text-center">
             <input type="checkbox" class="rounded border-neutral-300" onchange={(e) => {
-              if (e.target.checked) selectedLeads = new Set(pensioners.map(p => p.id));
+              if (e.currentTarget.checked) selectedLeads = new Set(pensioners.map(p => p.id));
               else selectedLeads.clear();
+              selectedLeads = new Set(selectedLeads);
             }} />
           </th>
           <th class="p-4">Nama Pensiunan</th>
