@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">SFAS</string>
+    <string name="title_activity_main">SFAS</string>
+    <string name="package_name">id.sfas.app</string>
+    <string name="custom_url_scheme">id.sfas.app</string>
+</resources>

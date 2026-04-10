@@ -1,0 +1,51 @@
+services:
+  sfas-db:
+    image: mysql:8.0
+    container_name: sfas-db
+    environment:
+      - MYSQL_DATABASE=sfas
+      - MYSQL_USER=admin
+      - MYSQL_PASSWORD=password
+      - MYSQL_ROOT_PASSWORD=rootpassword
+    ports:
+      - "3307:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 10s
+      retries: 5
+    networks:
+      - sfas-network
+
+  sfas-backend:
+    image: oven/bun:latest
+    container_name: sfas-backend
+    working_dir: /app
+    volumes:
+      - ./backend:/app
+    ports:
+      - "3001:3000"
+    environment:
+      - DATABASE_URL=mysql://admin:password@sfas-db:3306/sfas
+      - JWT_SECRET=sfas_super_secret_key
+    depends_on:
+      sfas-db:
+        condition: service_healthy
+    networks:
+      - sfas-network
+    command: bun run dev
+
+  sfas-frontend:
+    image: oven/bun:latest
+    container_name: sfas-frontend
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+    ports:
+      - "5173:5173"
+    networks:
+      - sfas-network
+    command: bun run dev -- --host
+
+networks:
+  sfas-network:
+    driver: bridge
