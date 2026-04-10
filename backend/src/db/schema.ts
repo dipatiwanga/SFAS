@@ -1,8 +1,13 @@
+<<<<<<< HEAD
 import { mysqlTable, serial, varchar, text, timestamp, int, decimal, boolean, bigint } from 'drizzle-orm/mysql-core';
+=======
+import { mysqlTable, serial, text, int, timestamp, decimal, mysqlEnum } from 'drizzle-orm/mysql-core';
+>>>>>>> e8a02607 (feat: implement requirements from Issue #3)
 import { relations } from 'drizzle-orm';
 
 export const users = mysqlTable('users', {
   id: serial('id').primaryKey(),
+<<<<<<< HEAD
   name: varchar('name', { length: 255 }).notNull(),
   email: varchar('email', { length: 255 }).notNull().unique(),
   role: varchar('role', { length: 50 }).notNull(), // 'supervisior', 'sales'
@@ -68,4 +73,48 @@ export const officesRelations = relations(offices, ({ many }) => ({
 export const usersRelations = relations(users, ({ many }) => ({
   pensioners: many(pensioners),
   activities: many(salesActivities),
+=======
+  name: text('name').notNull(),
+  email: text('email').unique().notNull(),
+  password: text('password').notNull(),
+  role: mysqlEnum('role', ['sales', 'admin']).notNull(),
+});
+
+export const clients = mysqlTable('clients', {
+  id: serial('id').primaryKey(),
+  shop_name: text('shop_name').notNull(),
+  address: text('address').notNull(),
+  contact: text('contact').notNull(),
+});
+
+export const activities = mysqlTable('activities', {
+  id: serial('id').primaryKey(),
+  user_id: int('user_id').references(() => users.id).notNull(),
+  client_id: int('client_id').references(() => clients.id).notNull(),
+  check_in_time: timestamp('check_in_time').defaultNow().notNull(),
+  lat: decimal('lat', { precision: 10, scale: 8 }),
+  long: decimal('long', { precision: 11, scale: 8 }),
+  image_url: text('image_url'),
+  notes: text('notes'),
+});
+
+// Relations
+export const usersRelations = relations(users, ({ many }) => ({
+  activities: many(activities),
+}));
+
+export const clientsRelations = relations(clients, ({ many }) => ({
+  activities: many(activities),
+}));
+
+export const activitiesRelations = relations(activities, ({ one }) => ({
+  user: one(users, {
+    fields: [activities.user_id],
+    references: [users.id],
+  }),
+  client: one(clients, {
+    fields: [activities.client_id],
+    references: [clients.id],
+  }),
+>>>>>>> e8a02607 (feat: implement requirements from Issue #3)
 }));
