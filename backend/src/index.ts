@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { Elysia, t } from 'elysia';
 import { cors } from '@elysiajs/cors';
 import { staticPlugin } from '@elysiajs/static';
@@ -161,3 +162,18 @@ const app = new Elysia()
   .listen({ port: PORT, hostname: '0.0.0.0' });
 
 console.log(`SFAS API is running at http://localhost:${PORT}`);
+=======
+import { Elysia } from 'elysia';
+import { cors } from '@elysiajs/cors';
+
+const PORT = 3000;
+
+const app = new Elysia()
+  .use(cors({
+    origin: true // Mengizinkan semua origin selama fase development
+  }))
+  .get('/', () => 'API Server Ready!')
+  .listen(PORT);
+
+console.log(`Server is running at http://${app.server?.hostname}:${app.server?.port}`);
+>>>>>>> e8a02607 (feat: implement requirements from Issue #3)

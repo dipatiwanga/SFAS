@@ -4,6 +4,7 @@ import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
 	preprocess: vitePreprocess(),
+<<<<<<< HEAD
 	compilerOptions: {
 		// Force runes mode for the project, except for libraries. Can be removed in svelte 6.
 		runes: ({ filename }) => (filename.split(/[/\\]/).includes('node_modules') ? undefined : true)
@@ -18,6 +19,19 @@ const config = {
 			precompress: false,
 			strict: true
 		})
+=======
+	kit: {
+		adapter: adapter({
+			pages: 'www',
+			assets: 'www',
+			fallback: 'index.html',
+			precompress: false,
+			strict: true
+		}),
+		prerender: {
+			entries: ['*']
+		}
+>>>>>>> e8a02607 (feat: implement requirements from Issue #3)
 	}
 };
 
