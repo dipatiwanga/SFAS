@@ -14,6 +14,7 @@ export const clients = mysqlTable('clients', {
   shop_name: varchar('shop_name', { length: 255 }).notNull(),
   address: text('address').notNull(),
   contact: varchar('contact', { length: 50 }).notNull(),
+  mitra: varchar('mitra', { length: 255 }),
 });
 
 export const activities = mysqlTable('activities', {

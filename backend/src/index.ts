@@ -118,14 +118,69 @@ const app = new Elysia()
         })
       })
 
-      .get('/activities', async () => {
+      .get('/activities', async ({ query }) => {
+        const { user_id, start_date, end_date, mitra, search } = query;
+        
+        const conditions = [];
+
+        if (user_id) conditions.push(eq(schema.activities.user_id, Number(user_id)));
+        
+        if (start_date && end_date) {
+          conditions.push(
+            and(
+              eq(schema.activities.check_in_time, new Date(start_date as string)),
+              eq(schema.activities.check_in_time, new Date(end_date as string))
+            )
+          );
+          // Note: and(between) is better, but since check_in_time is a timestamp, 
+          // we should handle start of day and end of day.
+          // For simplicity in this step, I'll use a better approach below.
+        }
+
+        const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+        // Better approach for complex filtering with joins in Drizzle:
         return await db.query.activities.findMany({
+          where: (activities, { and, eq, gte, lte, like, or }) => {
+            const filters = [];
+            if (user_id) filters.push(eq(activities.user_id, Number(user_id)));
+            if (start_date) filters.push(gte(activities.check_in_time, new Date(`${start_date}T00:00:00Z`)));
+            if (end_date) filters.push(lte(activities.check_in_time, new Date(`${end_date}T23:59:59Z`)));
+            
+            // To filter by mitra or client name, we need to join or use subqueries.
+            // drizzle.query handles relations nicely.
+            
+            return and(...filters);
+          },
           with: {
             user: true,
             client: true
           },
           orderBy: [desc(schema.activities.check_in_time)]
+        }).then(results => {
+          // Manual filtering for Mitra and Search if join is complex, 
+          // but better to do it in where.
+          let filtered = results;
+          if (mitra) {
+            filtered = filtered.filter(a => a.client?.mitra === mitra);
+          }
+          if (search) {
+            const searchLower = (search as string).toLowerCase();
+            filtered = filtered.filter(a => 
+              a.client?.shop_name.toLowerCase().includes(searchLower) ||
+              a.notes?.toLowerCase().includes(searchLower)
+            );
+          }
+          return filtered;
         });
+      }, {
+        query: t.Object({
+          user_id: t.Optional(t.String()),
+          start_date: t.Optional(t.String()),
+          end_date: t.Optional(t.String()),
+          mitra: t.Optional(t.String()),
+          search: t.Optional(t.String())
+        })
       })
 
       .post('/activities', async ({ body, set }) => {
