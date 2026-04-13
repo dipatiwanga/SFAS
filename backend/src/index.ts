@@ -4,7 +4,7 @@ import { jwt } from '@elysiajs/jwt';
 import { drizzle } from 'drizzle-orm/mysql2';
 import mysql from 'mysql2/promise';
 import * as schema from './db/schema';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and, gte, lte, like, or } from 'drizzle-orm';
 
 const PORT = 3000;
 const DB_URL = process.env.DATABASE_URL || 'mysql://admin:password@localhost:3307/sfas';
@@ -121,58 +121,61 @@ const app = new Elysia()
       .get('/activities', async ({ query }) => {
         const { user_id, start_date, end_date, mitra, search } = query;
         
-        const conditions = [];
+        const filters = [];
 
-        if (user_id) conditions.push(eq(schema.activities.user_id, Number(user_id)));
+        if (user_id) {
+          filters.push(eq(schema.activities.user_id, Number(user_id)));
+        }
         
-        if (start_date && end_date) {
-          conditions.push(
-            and(
-              eq(schema.activities.check_in_time, new Date(start_date as string)),
-              eq(schema.activities.check_in_time, new Date(end_date as string))
-            )
-          );
-          // Note: and(between) is better, but since check_in_time is a timestamp, 
-          // we should handle start of day and end of day.
-          // For simplicity in this step, I'll use a better approach below.
+        if (start_date) {
+          filters.push(gte(schema.activities.check_in_time, new Date(`${start_date}T00:00:00Z`)));
+        }
+        
+        if (end_date) {
+          filters.push(lte(schema.activities.check_in_time, new Date(`${end_date}T23:59:59Z`)));
         }
 
-        const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+        if (mitra) {
+          filters.push(eq(schema.clients.mitra, mitra));
+        }
 
-        // Better approach for complex filtering with joins in Drizzle:
-        return await db.query.activities.findMany({
-          where: (activities, { and, eq, gte, lte, like, or }) => {
-            const filters = [];
-            if (user_id) filters.push(eq(activities.user_id, Number(user_id)));
-            if (start_date) filters.push(gte(activities.check_in_time, new Date(`${start_date}T00:00:00Z`)));
-            if (end_date) filters.push(lte(activities.check_in_time, new Date(`${end_date}T23:59:59Z`)));
-            
-            // To filter by mitra or client name, we need to join or use subqueries.
-            // drizzle.query handles relations nicely.
-            
-            return and(...filters);
+        if (search) {
+          filters.push(
+            or(
+              like(schema.clients.shop_name, `%${search}%`),
+              like(schema.activities.notes, `%${search}%`)
+            )
+          );
+        }
+
+        // Using select for complex joins and direct filtering on related tables
+        return await db.select({
+          id: schema.activities.id,
+          user_id: schema.activities.user_id,
+          client_id: schema.activities.client_id,
+          check_in_time: schema.activities.check_in_time,
+          lat: schema.activities.lat,
+          long: schema.activities.long,
+          image_url: schema.activities.image_url,
+          notes: schema.activities.notes,
+          user: {
+            id: schema.users.id,
+            name: schema.users.name,
+            role: schema.users.role
           },
-          with: {
-            user: true,
-            client: true
-          },
-          orderBy: [desc(schema.activities.check_in_time)]
-        }).then(results => {
-          // Manual filtering for Mitra and Search if join is complex, 
-          // but better to do it in where.
-          let filtered = results;
-          if (mitra) {
-            filtered = filtered.filter(a => a.client?.mitra === mitra);
+          client: {
+            id: schema.clients.id,
+            shop_name: schema.clients.shop_name,
+            address: schema.clients.address,
+            contact: schema.clients.contact,
+            mitra: schema.clients.mitra
           }
-          if (search) {
-            const searchLower = (search as string).toLowerCase();
-            filtered = filtered.filter(a => 
-              a.client?.shop_name.toLowerCase().includes(searchLower) ||
-              a.notes?.toLowerCase().includes(searchLower)
-            );
-          }
-          return filtered;
-        });
+        })
+        .from(schema.activities)
+        .leftJoin(schema.users, eq(schema.activities.user_id, schema.users.id))
+        .leftJoin(schema.clients, eq(schema.activities.client_id, schema.clients.id))
+        .where(and(...filters))
+        .orderBy(desc(schema.activities.check_in_time));
       }, {
         query: t.Object({
           user_id: t.Optional(t.String()),

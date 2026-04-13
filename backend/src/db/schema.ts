@@ -1,4 +1,4 @@
-import { mysqlTable, serial, varchar, text, timestamp, decimal, mysqlEnum, bigint } from 'drizzle-orm/mysql-core';
+import { mysqlTable, serial, varchar, text, timestamp, decimal, mysqlEnum, bigint, index } from 'drizzle-orm/mysql-core';
 import { relations } from 'drizzle-orm';
 
 export const users = mysqlTable('users', {
@@ -26,7 +26,11 @@ export const activities = mysqlTable('activities', {
   long: decimal('long', { precision: 11, scale: 8 }),
   image_url: text('image_url'),
   notes: text('notes'),
-});
+}, (table) => ({
+  userIdIdx: index('user_id_idx').on(table.user_id),
+  clientIdIdx: index('client_id_idx').on(table.client_id),
+  checkInTimeIdx: index('check_in_time_idx').on(table.check_in_time),
+}));
 
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
